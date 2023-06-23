@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/osv"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
@@ -14,7 +15,7 @@ import (
 
 var bitnamiDir = filepath.Join("bitnami-vulndb", "data")
 
-func NewVulnSrc() osv.OSV {
+func NewVulnSrc(dbc db.Operation) osv.OSV {
 	sources := map[types.Ecosystem]types.DataSource{
 		vulnerability.Bitnami: {
 			ID:   vulnerability.BitnamiVulndb,
@@ -23,7 +24,7 @@ func NewVulnSrc() osv.OSV {
 		},
 	}
 
-	return osv.New(bitnamiDir, vulnerability.BitnamiVulndb, sources, &transformer{})
+	return osv.New(bitnamiDir, vulnerability.BitnamiVulndb, sources, &transformer{}, dbc)
 }
 
 type transformer struct{}

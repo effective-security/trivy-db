@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrctest"
@@ -57,10 +58,12 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "failed to decode arch linux json",
 		},
 	}
+	f := func(dbc db.Operation) vulnsrctest.Updater {
+		return NewVulnSrc(dbc)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := NewVulnSrc()
-			vulnsrctest.TestUpdate(t, vs, vulnsrctest.TestUpdateArgs{
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,

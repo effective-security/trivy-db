@@ -16,6 +16,8 @@ type Updater interface {
 	Update(dir string) (err error)
 }
 
+type UpdaterFactory func(dbc db.Operation) Updater
+
 type WantValues struct {
 	Key   []string
 	Value interface{}
@@ -28,25 +30,33 @@ type TestUpdateArgs struct {
 	NoBuckets  [][]string
 }
 
-func TestUpdate(t *testing.T, vulnsrc Updater, args TestUpdateArgs) {
+func TestUpdate(t *testing.T, vulnsrcf UpdaterFactory, args TestUpdateArgs) {
 	t.Helper()
 
 	tempDir := t.TempDir()
 	dbPath := db.Path(tempDir)
 
-	err := db.Init(tempDir)
+	// open for update
+	dbc, err := db.OpenForUpdate(tempDir)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() {
+		// the second close should not return an error
+		assert.NoError(t, dbc.Close())
+	}()
 
+	vulnsrc := vulnsrcf(dbc)
 	err = vulnsrc.Update(args.Dir)
 	if args.WantErr != "" {
 		require.NotNil(t, err)
 		assert.Contains(t, err.Error(), args.WantErr)
 		return
 	}
+	require.NoError(t, dbc.Close()) // Need to close before dbtest.JSONEq is called
 
+	// open for read
+	dbc, err = db.OpenReadonly(tempDir)
 	require.NoError(t, err)
-	require.NoError(t, db.Close()) // Need to close before dbtest.JSONEq is called
+
 	for _, want := range args.WantValues {
 		dbtest.JSONEq(t, dbPath, want.Key, want.Value, want.Key)
 	}
@@ -70,9 +80,6 @@ type TestGetArgs struct {
 
 func TestGet(t *testing.T, vulnsrc Getter, args TestGetArgs) {
 	t.Helper()
-
-	_ = dbtest.InitDB(t, args.Fixtures)
-	defer db.Close()
 
 	got, err := vulnsrc.Get(args.Release, args.PkgName)
 

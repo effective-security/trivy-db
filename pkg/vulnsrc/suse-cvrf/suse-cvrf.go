@@ -44,10 +44,10 @@ type VulnSrc struct {
 	dbc  db.Operation
 }
 
-func NewVulnSrc(dist Distribution) VulnSrc {
+func NewVulnSrc(dbc db.Operation, dist Distribution) VulnSrc {
 	return VulnSrc{
 		dist: dist,
-		dbc:  db.Config{},
+		dbc:  dbc,
 	}
 }
 

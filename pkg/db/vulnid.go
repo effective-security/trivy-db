@@ -17,8 +17,8 @@ func (dbc Config) PutVulnerabilityID(tx *bolt.Tx, vulnID string) error {
 	return bucket.Put([]byte(vulnID), []byte("{}"))
 }
 
-func (dbc Config) ForEachVulnerabilityID(f func(tx *bolt.Tx, vulnID string) error) error {
-	err := db.Batch(func(tx *bolt.Tx) error {
+func (dbc Config) ForEachVulnerabilityID(withUpdate bool, f func(tx *bolt.Tx, vulnID string) error) error {
+	forEach := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(vulnerabilityIDBucket))
 		if bucket == nil {
 			return xerrors.Errorf("no such bucket: %s", vulnerabilityIDBucket)
@@ -33,8 +33,13 @@ func (dbc Config) ForEachVulnerabilityID(f func(tx *bolt.Tx, vulnID string) erro
 			return xerrors.Errorf("error in for each: %w", err)
 		}
 		return nil
-	})
-	return err
+	}
+
+	if withUpdate {
+		return dbc.db.Batch(forEach)
+	}
+	return dbc.db.View(forEach)
+
 }
 
 func (dbc Config) DeleteVulnerabilityIDBucket() error {

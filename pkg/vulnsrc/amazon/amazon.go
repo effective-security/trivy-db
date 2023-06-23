@@ -63,9 +63,9 @@ type Reference struct {
 	Href string `json:"href,omitempty"`
 }
 
-func NewVulnSrc() VulnSrc {
+func NewVulnSrc(dbc db.Operation) VulnSrc {
 	return VulnSrc{
-		dbc:        db.Config{},
+		dbc:        dbc,
 		advisories: map[string][]ALAS{},
 	}
 }

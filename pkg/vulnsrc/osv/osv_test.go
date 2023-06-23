@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/osv"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
@@ -120,18 +121,19 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "JSON decode error",
 		},
 	}
-
+	dataSources := map[types.Ecosystem]types.DataSource{
+		vulnerability.Pip: {
+			ID:   vulnerability.OSV,
+			Name: "Python Packaging Advisory Database",
+			URL:  "https://github.com/pypa/advisory-db",
+		},
+	}
+	f := func(dbc db.Operation) vulnsrctest.Updater {
+		return osv.New(".", vulnerability.OSV, dataSources, nil, dbc)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dataSources := map[types.Ecosystem]types.DataSource{
-				vulnerability.Pip: {
-					ID:   vulnerability.OSV,
-					Name: "Python Packaging Advisory Database",
-					URL:  "https://github.com/pypa/advisory-db",
-				},
-			}
-			o := osv.New(".", vulnerability.OSV, dataSources, nil)
-			vulnsrctest.TestUpdate(t, o, vulnsrctest.TestUpdateArgs{
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,

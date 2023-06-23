@@ -53,9 +53,9 @@ type Oracle struct {
 	db.Operation
 }
 
-func NewVulnSrc() *VulnSrc {
+func NewVulnSrc(dbc db.Operation) *VulnSrc {
 	return &VulnSrc{
-		DB: &Oracle{Operation: db.Config{}},
+		DB: &Oracle{Operation: dbc},
 	}
 }
 

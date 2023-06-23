@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 
 	fixtures "github.com/aquasecurity/bolt-fixtures"
 	"github.com/aquasecurity/trivy-db/pkg/db"
 )
 
-func InitDB(t *testing.T, fixtureFiles []string) string {
+func InitDB(t *testing.T, fixtureFiles []string) (db.Operation, string) {
 	t.Helper()
 
 	// Create a temp dir
@@ -30,7 +31,8 @@ func InitDB(t *testing.T, fixtureFiles []string) string {
 	require.NoError(t, loader.Close())
 
 	// Initialize DB
-	require.NoError(t, db.Init(dir))
+	dbc, err := db.NewBoltProvider(dir, &bbolt.Options{ReadOnly: false})
+	require.NoError(t, err)
 
-	return dir
+	return dbc, dir
 }

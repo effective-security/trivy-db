@@ -371,10 +371,12 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "failed to decode Rocky erratum",
 		},
 	}
+	f := func(dbc db.Operation) vulnsrctest.Updater {
+		return rocky.NewVulnSrc(dbc)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := rocky.NewVulnSrc()
-			vulnsrctest.TestUpdate(t, vs, vulnsrctest.TestUpdateArgs{
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,
@@ -481,10 +483,10 @@ func TestRocky_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = dbtest.InitDB(t, tt.fixtures)
-			defer db.Close()
+			dbc, _ := dbtest.InitDB(t, tt.fixtures)
 
-			vs := rocky.NewVulnSrc()
+			vs := rocky.NewVulnSrc(dbc)
+			defer vs.Close()
 			got, err := vs.Get(tt.args.release, tt.args.pkgName, tt.args.arch)
 
 			tt.wantErr(t, err)

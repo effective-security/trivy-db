@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/alpine"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
@@ -55,10 +56,12 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "failed to decode Alpine advisory",
 		},
 	}
+	f := func(dbc db.Operation) vulnsrctest.Updater {
+		return alpine.NewVulnSrc(dbc)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := alpine.NewVulnSrc()
-			vulnsrctest.TestUpdate(t, vs, vulnsrctest.TestUpdateArgs{
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,

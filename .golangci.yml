@@ -1,7 +1,8 @@
 run:
   go: '1.19'
   timeout: 5m
-  skip-dirs:
+issues:
+  exclude-dirs:
     - cache
     - assets
 linters:
