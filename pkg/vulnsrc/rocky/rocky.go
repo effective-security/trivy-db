@@ -65,9 +65,9 @@ type Rocky struct {
 	db.Operation
 }
 
-func NewVulnSrc() *VulnSrc {
+func NewVulnSrc(dbc db.Operation) *VulnSrc {
 	return &VulnSrc{
-		DB: &Rocky{Operation: db.Config{}},
+		DB: &Rocky{Operation: dbc},
 	}
 }
 

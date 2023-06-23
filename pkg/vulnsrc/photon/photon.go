@@ -31,9 +31,9 @@ type VulnSrc struct {
 	dbc db.Operation
 }
 
-func NewVulnSrc() VulnSrc {
+func NewVulnSrc(dbc db.Operation) VulnSrc {
 	return VulnSrc{
-		dbc: db.Config{},
+		dbc: dbc,
 	}
 }
 

@@ -19,27 +19,37 @@ type CustomPut func(dbc Operation, tx *bolt.Tx, adv interface{}) error
 
 const SchemaVersion = 2
 
-var (
-	db    *bolt.DB
-	dbDir string
-)
+type Vulnerability interface {
+	GetVulnerability(vulnerabilityID string) (vulnerability types.Vulnerability, err error)
+}
+
+type VulnerabilityDetail interface {
+	GetVulnerabilityDetail(cveID string) (detail map[types.SourceID]types.VulnerabilityDetail, err error)
+}
+
+type Advisory interface {
+	ForEachAdvisory(sources []string, pkgName string) (value map[string]Value, err error)
+	GetAdvisories(source string, pkgName string) (advisories []types.Advisory, err error)
+	RedHatRepoToCPEs(repository string) (cpeIndices []int, err error)
+	RedHatNVRToCPEs(nvr string) (cpeIndices []int, err error)
+}
 
 type Operation interface {
+	Vulnerability
+	VulnerabilityDetail
+	Advisory
+
 	BatchUpdate(fn func(*bolt.Tx) error) (err error)
 
-	GetVulnerabilityDetail(cveID string) (detail map[types.SourceID]types.VulnerabilityDetail, err error)
 	PutVulnerabilityDetail(tx *bolt.Tx, vulnerabilityID string, source types.SourceID,
 		vulnerability types.VulnerabilityDetail) (err error)
 	DeleteVulnerabilityDetailBucket() (err error)
 
-	ForEachAdvisory(sources []string, pkgName string) (value map[string]Value, err error)
-	GetAdvisories(source string, pkgName string) (advisories []types.Advisory, err error)
-
 	PutVulnerabilityID(tx *bolt.Tx, vulnerabilityID string) (err error)
-	ForEachVulnerabilityID(fn func(tx *bolt.Tx, cveID string) error) (err error)
+	ForEachVulnerabilityID(withUpdate bool, fn func(tx *bolt.Tx, cveID string) error) (err error)
 
 	PutVulnerability(tx *bolt.Tx, vulnerabilityID string, vulnerability types.Vulnerability) (err error)
-	GetVulnerability(vulnerabilityID string) (vulnerability types.Vulnerability, err error)
+	DeleteVulnerabilityIDBucket() error
 
 	SaveAdvisoryDetails(tx *bolt.Tx, cveID string) (err error)
 	PutAdvisoryDetail(tx *bolt.Tx, vulnerabilityID, pkgName string, nestedBktNames []string, advisory interface{}) (err error)
@@ -51,18 +61,43 @@ type Operation interface {
 	PutRedHatRepositories(tx *bolt.Tx, repository string, cpeIndices []int) (err error)
 	PutRedHatNVRs(tx *bolt.Tx, nvr string, cpeIndices []int) (err error)
 	PutRedHatCPEs(tx *bolt.Tx, cpeIndex int, cpe string) (err error)
-	RedHatRepoToCPEs(repository string) (cpeIndices []int, err error)
-	RedHatNVRToCPEs(nvr string) (cpeIndices []int, err error)
+
+	// Close DB
+	Close() error
 }
 
 type Config struct {
+	db       *bolt.DB
+	cacheDir string
 }
 
-func Init(cacheDir string) (err error) {
+// OpenForUpdate returns the default provider, with full access to the database,
+// locking the database for exclusive access.
+func OpenForUpdate(cacheDir string) (dbc Operation, err error) {
+	return NewBoltProvider(cacheDir, &bolt.Options{ReadOnly: false})
+}
+
+// OpenReadonly returns the default provider, with read-only access to the database,
+// allowing multiple readers to access the database concurrently.
+func OpenReadonly(cacheDir string) (dbc Operation, err error) {
+	return NewBoltProvider(cacheDir, &bolt.Options{ReadOnly: true})
+}
+
+func NewBoltProvider(cacheDir string, options *bolt.Options) (dbc Operation, err error) {
+	b, err := initBolt(cacheDir, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{db: b, cacheDir: cacheDir}, nil
+
+}
+
+func initBolt(cacheDir string, options *bolt.Options) (db *bolt.DB, err error) {
 	dbPath := Path(cacheDir)
-	dbDir = filepath.Dir(dbPath)
+	dbDir := filepath.Dir(dbPath)
 	if err = os.MkdirAll(dbDir, 0700); err != nil {
-		return xerrors.Errorf("failed to mkdir: %w", err)
+		return nil, xerrors.Errorf("failed to mkdir: %w", err)
 	}
 
 	// bbolt sometimes occurs the fatal error of "unexpected fault address".
@@ -78,11 +113,12 @@ func Init(cacheDir string) (err error) {
 		debug.SetPanicOnFault(false)
 	}()
 
-	db, err = bolt.Open(dbPath, 0600, nil)
+	//log.Logger.Debugf("DB: open: %s", dbPath)
+	db, err = bolt.Open(dbPath, 0600, options)
 	if err != nil {
-		return xerrors.Errorf("failed to open db: %w", err)
+		return nil, xerrors.Errorf("failed to open db: %w", err)
 	}
-	return nil
+	return db, nil
 }
 
 func Dir(cacheDir string) string {
@@ -94,23 +130,24 @@ func Path(cacheDir string) string {
 	return dbPath
 }
 
-func Close() error {
+func (dbc Config) Close() error {
 	// Skip closing the database if the connection is not established.
-	if db == nil {
+	if dbc.db == nil {
 		return nil
 	}
-	if err := db.Close(); err != nil {
+	if err := dbc.db.Close(); err != nil {
 		return xerrors.Errorf("failed to close DB: %w", err)
 	}
+	//log.Logger.Debugf("DB: closed: %s", dbc.cacheDir)
 	return nil
 }
 
 func (dbc Config) Connection() *bolt.DB {
-	return db
+	return dbc.db
 }
 
 func (dbc Config) BatchUpdate(fn func(tx *bolt.Tx) error) error {
-	err := db.Batch(fn)
+	err := dbc.db.Batch(fn)
 	if err != nil {
 		return xerrors.Errorf("error in batch update: %w", err)
 	}
@@ -142,7 +179,7 @@ func (dbc Config) put(tx *bolt.Tx, bktNames []string, key string, value interfac
 }
 
 func (dbc Config) get(bktNames []string, key string) (value []byte, err error) {
-	err = db.View(func(tx *bolt.Tx) error {
+	err = dbc.db.View(func(tx *bolt.Tx) error {
 		if len(bktNames) == 0 {
 			return xerrors.Errorf("empty bucket name")
 		}
@@ -183,7 +220,7 @@ func (dbc Config) forEach(bktNames []string) (map[string]Value, error) {
 	rootBucket, nestedBuckets := bktNames[0], bktNames[1:]
 
 	values := map[string]Value{}
-	err := db.View(func(tx *bolt.Tx) error {
+	err := dbc.db.View(func(tx *bolt.Tx) error {
 		var rootBuckets []string
 
 		if strings.Contains(rootBucket, "::") {
@@ -247,7 +284,7 @@ func (dbc Config) forEach(bktNames []string) (map[string]Value, error) {
 }
 
 func (dbc Config) deleteBucket(bucketName string) error {
-	return db.Update(func(tx *bolt.Tx) error {
+	return dbc.db.Update(func(tx *bolt.Tx) error {
 		if err := tx.DeleteBucket([]byte(bucketName)); err != nil {
 			return xerrors.Errorf("failed to delete bucket: %w", err)
 		}

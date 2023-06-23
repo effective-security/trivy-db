@@ -95,11 +95,11 @@ func TestTrivyDB_Insert(t *testing.T) {
 			}
 			cacheDir := filepath.Join(t.TempDir(), tt.fields.cacheDir)
 
-			require.NoError(t, db.Init(cacheDir))
-			defer db.Close()
+			dbc, err := db.OpenForUpdate(cacheDir)
+			require.NoError(t, err)
 
-			c := vulndb.New(cacheDir, 12*time.Hour, vulndb.WithClock(tt.fields.clock), vulndb.WithVulnSrcs(vulnsrcs))
-			err := c.Insert(tt.args.targets)
+			c := vulndb.New(dbc, cacheDir, 12*time.Hour, vulndb.WithClock(tt.fields.clock), vulndb.WithVulnSrcs(vulnsrcs))
+			err = c.Insert(tt.args.targets)
 			if tt.wantErr != "" {
 				require.NotNil(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -185,10 +185,10 @@ func TestTrivyDB_Build(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheDir := dbtest.InitDB(t, tt.fixtures)
-			defer db.Close()
+			dbc, cacheDir := dbtest.InitDB(t, tt.fixtures)
+			defer dbc.Close()
 
-			full := vulndb.New(cacheDir, 12*time.Hour)
+			full := vulndb.New(dbc, cacheDir, 12*time.Hour)
 			err := full.Build(nil)
 			if tt.wantErr != "" {
 				require.NotNil(t, err)
@@ -198,7 +198,8 @@ func TestTrivyDB_Build(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compare DB entries
-			require.NoError(t, db.Close())
+			require.NoError(t, dbc.Close())
+
 			dbPath := db.Path(cacheDir)
 			for _, want := range tt.wantValues {
 				dbtest.JSONEq(t, dbPath, want.key, want.value)

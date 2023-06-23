@@ -43,8 +43,9 @@ func TestInit(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := db.Init(tmpDir)
+			dbc, err := db.OpenForUpdate(tmpDir)
 			require.NoError(t, err)
+			defer dbc.Close()
 		})
 	}
 }

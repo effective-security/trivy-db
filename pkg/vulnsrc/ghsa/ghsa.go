@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/osv"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
@@ -44,17 +45,21 @@ type DatabaseSpecific struct {
 	LastKnownAffectedVersionRange string `json:"last_known_affected_version_range"`
 }
 
-type GHSA struct{}
+type GHSA struct {
+	dbc db.Operation
+}
 
-func NewVulnSrc() GHSA {
-	return GHSA{}
+func NewVulnSrc(dbc db.Operation) GHSA {
+	return GHSA{
+		dbc: dbc,
+	}
 }
 
 func (GHSA) Name() types.SourceID {
 	return vulnerability.GHSA
 }
 
-func (GHSA) Update(root string) error {
+func (g GHSA) Update(root string) error {
 	dataSources := map[types.Ecosystem]types.DataSource{}
 	for ecosystem, ghsaEcosystem := range ecosystems {
 		src := types.DataSource{
@@ -70,7 +75,7 @@ func (GHSA) Update(root string) error {
 		return xerrors.Errorf("transformer error: %w", err)
 	}
 
-	return osv.New(ghsaDir, sourceID, dataSources, t).Update(root)
+	return osv.New(ghsaDir, sourceID, dataSources, t, g.dbc).Update(root)
 }
 
 type transformer struct {

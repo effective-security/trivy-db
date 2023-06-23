@@ -59,10 +59,9 @@ func TestConfig_SaveAdvisoryDetails(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Initialize DB for testing
-			tmpDir := dbtest.InitDB(t, tt.fixtures)
-			defer db.Close()
+			dbc, tmpDir := dbtest.InitDB(t, tt.fixtures)
+			defer dbc.Close()
 
-			dbc := db.Config{}
 			err := dbc.BatchUpdate(func(tx *bolt.Tx) error {
 				return dbc.SaveAdvisoryDetails(tx, tt.vulnID)
 			})
@@ -74,7 +73,7 @@ func TestConfig_SaveAdvisoryDetails(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			require.NoError(t, db.Close()) // Need to close before dbtest.JSONEq is called
+			require.NoError(t, dbc.Close()) // Need to close before dbtest.JSONEq is called
 			for _, w := range tt.want {
 				dbtest.JSONEq(t, db.Path(tmpDir), w.key, w.value)
 			}
