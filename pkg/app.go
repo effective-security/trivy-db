@@ -5,6 +5,7 @@ import (
 
 	"github.com/urfave/cli"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/utils"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc"
 )
@@ -28,7 +29,7 @@ func (ac *AppConfig) NewApp(version string) *cli.App {
 					Usage: "update db only specified distribution",
 					Value: func() *cli.StringSlice {
 						var targets cli.StringSlice
-						for _, v := range vulnsrc.All {
+						for _, v := range vulnsrc.All(db.Config{}) {
 							targets = append(targets, string(v.Name()))
 						}
 						return &targets

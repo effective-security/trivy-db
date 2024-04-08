@@ -55,9 +55,9 @@ type Alma struct {
 	db.Operation
 }
 
-func NewVulnSrc() *VulnSrc {
+func NewVulnSrc(dbc db.Operation) *VulnSrc {
 	return &VulnSrc{
-		DB: &Alma{Operation: db.Config{}},
+		DB: &Alma{Operation: dbc},
 	}
 }
 

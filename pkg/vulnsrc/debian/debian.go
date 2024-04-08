@@ -92,10 +92,10 @@ type VulnSrc struct {
 	notAffected map[bucket]struct{}
 }
 
-func NewVulnSrc(opts ...Option) VulnSrc {
+func NewVulnSrc(dbc db.Operation, opts ...Option) VulnSrc {
 	src := VulnSrc{
 		put:              defaultPut,
-		dbc:              db.Config{},
+		dbc:              dbc,
 		distributions:    map[string]string{},
 		details:          map[string]VulnerabilityDetail{},
 		pkgVersions:      map[bucket]string{},
@@ -613,16 +613,16 @@ func (vs VulnSrc) parseSources(dir string) error {
 //	  When the latest version in the release is greater than the fixed version in sid,
 //	  we can assume that the vulnerability was already fixed at the fixed version.
 //	  e.g.
-//		latest version (buster) : "5.0-4"
+//		   latest version (buster) : "5.0-4"
 //	    fixed version (sid)     : "5.0-2"
-//	    => the vulnerability was fixed at "5.0-2".
+//	     => the vulnerability was fixed at "5.0-2".
 //
 // Case 2
 //
 //	  When the latest version in the release less than the fixed version in sid,
 //	  it means the vulnerability has not been fixed yet.
 //	  e.g.
-//		latest version (buster) : "5.0-4"
+//		   latest version (buster) : "5.0-4"
 //	    fixed version (sid)     : "5.0-5"
 //	     => the vulnerability hasn't been fixed yet.
 //

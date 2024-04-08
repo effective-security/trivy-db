@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
+	"github.com/aquasecurity/trivy-db/pkg/dbtest"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrctest"
@@ -162,10 +164,13 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "failed to decode SUSE CVRF JSON",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := NewVulnSrc(tt.dist)
-			vulnsrctest.TestUpdate(t, vs, vulnsrctest.TestUpdateArgs{
+			f := func(dbc db.Operation) vulnsrctest.Updater {
+				return NewVulnSrc(dbc, tt.dist)
+			}
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,
@@ -216,7 +221,10 @@ func TestVulnSrc_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := NewVulnSrc(tt.dist)
+			dbc, _ := dbtest.InitDB(t, tt.fixtures)
+			defer dbc.Close()
+
+			vs := NewVulnSrc(dbc, tt.dist)
 			vulnsrctest.TestGet(t, vs, vulnsrctest.TestGetArgs{
 				Fixtures:   tt.fixtures,
 				WantValues: tt.want,

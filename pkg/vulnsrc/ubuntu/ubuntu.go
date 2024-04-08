@@ -76,10 +76,10 @@ type VulnSrc struct {
 	dbc db.Operation
 }
 
-func NewVulnSrc(opts ...Option) VulnSrc {
+func NewVulnSrc(dbc db.Operation, opts ...Option) VulnSrc {
 	src := VulnSrc{
 		put: defaultPut,
-		dbc: db.Config{},
+		dbc: dbc,
 	}
 
 	for _, o := range opts {

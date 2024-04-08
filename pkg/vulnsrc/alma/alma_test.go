@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/alma"
 	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
@@ -115,10 +116,13 @@ func TestVulnSrc_Update(t *testing.T) {
 			wantErr: "failed to decode Alma erratum",
 		},
 	}
+
+	f := func(dbc db.Operation) vulnsrctest.Updater {
+		return alma.NewVulnSrc(dbc)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vs := alma.NewVulnSrc()
-			vulnsrctest.TestUpdate(t, vs, vulnsrctest.TestUpdateArgs{
+			vulnsrctest.TestUpdate(t, f, vulnsrctest.TestUpdateArgs{
 				Dir:        tt.dir,
 				WantValues: tt.wantValues,
 				WantErr:    tt.wantErr,

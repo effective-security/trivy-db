@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/aquasecurity/trivy-db/pkg/db"
 	"github.com/aquasecurity/trivy-db/pkg/dbtest"
 	"github.com/aquasecurity/trivy-db/pkg/types"
 )
@@ -81,10 +80,9 @@ func TestConfig_ForEachAdvisory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Initialize DB
-			dbtest.InitDB(t, tt.fixtures)
-			defer db.Close()
+			dbc, _ := dbtest.InitDB(t, tt.fixtures)
+			defer dbc.Close()
 
-			dbc := db.Config{}
 			got, err := dbc.ForEachAdvisory([]string{tt.args.source}, tt.args.pkgName)
 
 			if tt.wantErr != "" {
@@ -202,10 +200,9 @@ func TestConfig_GetAdvisories(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Initialize DB
-			dbtest.InitDB(t, tt.fixtures)
-			defer db.Close()
+			dbc, _ := dbtest.InitDB(t, tt.fixtures)
+			defer dbc.Close()
 
-			dbc := db.Config{}
 			got, err := dbc.GetAdvisories(tt.args.source, tt.args.pkgName)
 
 			switch {

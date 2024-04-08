@@ -20,7 +20,7 @@ type VulnDB interface {
 }
 
 type TrivyDB struct {
-	dbc            db.Config
+	dbc            db.Operation
 	metadata       metadata.Client
 	vulnClient     vulnerability.Vulnerability
 	vulnSrcs       map[types.SourceID]vulnsrc.VulnSrc
@@ -43,14 +43,13 @@ func WithVulnSrcs(srcs map[types.SourceID]vulnsrc.VulnSrc) Option {
 	}
 }
 
-func New(cacheDir string, updateInterval time.Duration, opts ...Option) *TrivyDB {
+func New(dbc db.Operation, cacheDir string, updateInterval time.Duration, opts ...Option) *TrivyDB {
 	// Initialize map
 	vulnSrcs := map[types.SourceID]vulnsrc.VulnSrc{}
-	for _, v := range vulnsrc.All {
+	for _, v := range vulnsrc.All(dbc) {
 		vulnSrcs[v.Name()] = v
 	}
 
-	dbc := db.Config{}
 	tdb := &TrivyDB{
 		dbc:            dbc,
 		metadata:       metadata.NewClient(cacheDir),
@@ -127,7 +126,7 @@ func (t TrivyDB) optimize() error {
 	// NVD also contains many vulnerabilities that are not related to OS packages or language-specific packages.
 	// Trivy DB will not store them so that it could reduce the database size.
 	// This bucket has only vulnerability IDs provided by vendors. They must be stored.
-	err := t.dbc.ForEachVulnerabilityID(func(tx *bolt.Tx, cveID string) error {
+	err := t.dbc.ForEachVulnerabilityID(true, func(tx *bolt.Tx, cveID string) error {
 		details := t.vulnClient.GetDetails(cveID)
 		if t.vulnClient.IsRejected(details) {
 			return nil

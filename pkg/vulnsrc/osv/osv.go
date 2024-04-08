@@ -53,6 +53,10 @@ type OSV struct {
 	transformer Transformer
 }
 
+// type VulnSrc struct {
+// 	dbc db.Operation
+// }
+
 type Transformer interface {
 	TransformAdvisories([]Advisory, Entry) ([]Advisory, error)
 }
@@ -63,18 +67,24 @@ func (t *defaultTransformer) TransformAdvisories(advs []Advisory, _ Entry) ([]Ad
 	return advs, nil
 }
 
-func New(dir string, sourceID types.SourceID, dataSources map[types.Ecosystem]types.DataSource, transformer Transformer) OSV {
+func New(dir string, sourceID types.SourceID, dataSources map[types.Ecosystem]types.DataSource, transformer Transformer, dbc db.Operation) OSV {
 	if transformer == nil {
 		transformer = &defaultTransformer{}
 	}
 	return OSV{
 		dir:         dir,
-		dbc:         db.Config{},
+		dbc:         dbc,
 		sourceID:    sourceID,
 		dataSources: dataSources,
 		transformer: transformer,
 	}
 }
+
+// func NewVulnSrc(dbc db.Operation) VulnSrc {
+// 	return VulnSrc{
+// 		dbc: dbc,
+// 	}
+// }
 
 func (o OSV) Name() types.SourceID {
 	return o.sourceID
