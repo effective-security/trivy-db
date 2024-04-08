@@ -29,7 +29,7 @@ func (ac *AppConfig) NewApp(version string) *cli.App {
 					Usage: "update db only specified distribution",
 					Value: func() *cli.StringSlice {
 						var targets cli.StringSlice
-						for _, v := range vulnsrc.All(db.Config{}) {
+						for _, v := range vulnsrc.All(&db.Config{}) {
 							targets = append(targets, string(v.Name()))
 						}
 						return &targets

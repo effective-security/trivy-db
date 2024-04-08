@@ -68,7 +68,7 @@ type Operation interface {
 
 type Config struct {
 	db       *bolt.DB
-	cacheDir string
+	fileName string
 }
 
 // OpenForUpdate returns the default provider, with full access to the database,
@@ -84,20 +84,20 @@ func OpenReadonly(cacheDir string) (dbc Operation, err error) {
 }
 
 func NewBoltProvider(cacheDir string, options *bolt.Options) (dbc Operation, err error) {
-	b, err := initBolt(cacheDir, options)
+	b, dbPath, err := initBolt(cacheDir, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Config{db: b, cacheDir: cacheDir}, nil
+	return &Config{db: b, fileName: dbPath}, nil
 
 }
 
-func initBolt(cacheDir string, options *bolt.Options) (db *bolt.DB, err error) {
-	dbPath := Path(cacheDir)
+func initBolt(cacheDir string, options *bolt.Options) (db *bolt.DB, dbPath string, err error) {
+	dbPath = Path(cacheDir)
 	dbDir := filepath.Dir(dbPath)
 	if err = os.MkdirAll(dbDir, 0700); err != nil {
-		return nil, xerrors.Errorf("failed to mkdir: %w", err)
+		return nil, dbPath, xerrors.Errorf("failed to mkdir: %w", err)
 	}
 
 	// bbolt sometimes occurs the fatal error of "unexpected fault address".
@@ -113,12 +113,14 @@ func initBolt(cacheDir string, options *bolt.Options) (db *bolt.DB, err error) {
 		debug.SetPanicOnFault(false)
 	}()
 
-	//log.Logger.Debugf("DB: open: %s", dbPath)
+	// isReadonly := options != nil && options.ReadOnly
+	// log.Logger.Debugf("DB: open: %s, readonly: %t", dbPath, isReadonly)
+
 	db, err = bolt.Open(dbPath, 0600, options)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to open db: %w", err)
+		return nil, dbPath, xerrors.Errorf("failed to open db: %w", err)
 	}
-	return db, nil
+	return db, dbPath, nil
 }
 
 func Dir(cacheDir string) string {
@@ -130,7 +132,7 @@ func Path(cacheDir string) string {
 	return dbPath
 }
 
-func (dbc Config) Close() error {
+func (dbc *Config) Close() error {
 	// Skip closing the database if the connection is not established.
 	if dbc.db == nil {
 		return nil
@@ -138,15 +140,16 @@ func (dbc Config) Close() error {
 	if err := dbc.db.Close(); err != nil {
 		return xerrors.Errorf("failed to close DB: %w", err)
 	}
-	//log.Logger.Debugf("DB: closed: %s", dbc.cacheDir)
+	//log.Logger.Debugf("DB: closed: %s", dbc.fileName)
+	dbc.db = nil
 	return nil
 }
 
-func (dbc Config) Connection() *bolt.DB {
+func (dbc *Config) Connection() *bolt.DB {
 	return dbc.db
 }
 
-func (dbc Config) BatchUpdate(fn func(tx *bolt.Tx) error) error {
+func (dbc *Config) BatchUpdate(fn func(tx *bolt.Tx) error) error {
 	err := dbc.db.Batch(fn)
 	if err != nil {
 		return xerrors.Errorf("error in batch update: %w", err)
@@ -154,7 +157,7 @@ func (dbc Config) BatchUpdate(fn func(tx *bolt.Tx) error) error {
 	return nil
 }
 
-func (dbc Config) put(tx *bolt.Tx, bktNames []string, key string, value interface{}) error {
+func (dbc *Config) put(tx *bolt.Tx, bktNames []string, key string, value interface{}) error {
 	if len(bktNames) == 0 {
 		return xerrors.Errorf("empty bucket name")
 	}
@@ -178,7 +181,7 @@ func (dbc Config) put(tx *bolt.Tx, bktNames []string, key string, value interfac
 	return bkt.Put([]byte(key), v)
 }
 
-func (dbc Config) get(bktNames []string, key string) (value []byte, err error) {
+func (dbc *Config) get(bktNames []string, key string) (value []byte, err error) {
 	err = dbc.db.View(func(tx *bolt.Tx) error {
 		if len(bktNames) == 0 {
 			return xerrors.Errorf("empty bucket name")
@@ -213,7 +216,7 @@ type Value struct {
 	Content []byte
 }
 
-func (dbc Config) forEach(bktNames []string) (map[string]Value, error) {
+func (dbc *Config) forEach(bktNames []string) (map[string]Value, error) {
 	if len(bktNames) < 2 {
 		return nil, xerrors.Errorf("bucket must be nested: %v", bktNames)
 	}
@@ -283,7 +286,7 @@ func (dbc Config) forEach(bktNames []string) (map[string]Value, error) {
 	return values, nil
 }
 
-func (dbc Config) deleteBucket(bucketName string) error {
+func (dbc *Config) deleteBucket(bucketName string) error {
 	return dbc.db.Update(func(tx *bolt.Tx) error {
 		if err := tx.DeleteBucket([]byte(bucketName)); err != nil {
 			return xerrors.Errorf("failed to delete bucket: %w", err)
